@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List with Categories</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            width: 100%;
+            gap: 10px;
+        }
+        .box {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            box-sizing: border-box;
+        }
+        .input-container {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        #taskInput {
+            flex-grow: 1;
+            padding: 6px;
+            font-size: 14px;
+            min-width: 100px;
+        }
+        #categorySelect {
+            padding: 6px;
+            font-size: 14px;
+        }
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            color: white;
+            font-size: 14px;
+        }
+        .add-btn { background-color: #4CAF50; }
+        .add-btn:hover { background-color: #45a049; }
+        .done-btn { background-color: #2196F3; }
+        .done-btn:hover { background-color: #1976D2; }
+        .delete-btn { background-color: #ff4444; }
+        .delete-btn:hover { background-color: #cc0000; }
+        .task-list, .completed-list {
+            list-style-type: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .category-section {
+            margin-bottom: 15px;
+        }
+        .category-section h2 {
+            font-size: 16px;
+            margin: 8px 0;
+            color: #555;
+        }
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 4px 0;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .task-item span {
+            flex-grow: 1;
+            margin-right: 8px;
+            word-break: break-word;
+            font-size: 14px;
+        }
+        .completed-list .task-item {
+            background-color: #e0f7fa;
+            border-color: #b2ebf2;
+        }
+        #timeline {
+            max-width: 800px;
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            box-sizing: border-box;
+        }
+        #timeline h2 { text-align: center; font-size: 18px; }
+        #timelineFilter { margin-bottom: 10px; text-align: center; }
+        .timeline-item {
+            padding: 8px;
+            margin: 4px 0;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        @media (min-width: 600px) {
+            .container { flex-direction: row; }
+            .box { width: 50%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="box">
+            <h1>To-Do Tasks</h1>
+            <div class="input-container">
+                <input type="text" id="taskInput" placeholder="Add a new task...">
+                <select id="categorySelect">
+                    <option value="Client">Client</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Household">Household</option>
+                </select>
+                <button class="add-btn" onclick="addTask()">Add</button>
+            </div>
+            <div id="taskList" class="task-list"></div>
+        </div>
+        <div class="box">
+            <h1>Completed Tasks</h1>
+            <div id="completedList" class="completed-list"></div>
+        </div>
+    </div>
+    <div id="timeline">
+        <h2>Timeline of Completed Tasks</h2>
+        <div id="timelineFilter">
+            <label>Filter: </label>
+            <select id="timeFilter" onchange="updateTimeline()">
+                <option value="week">Last Week</option>
+                <option value="month">Last Month</option>
+                <option value="year">Last Year</option>
+                <option value="all" selected>All Time</option>
+            </select>
+        </div>
+        <div id="timelineContent"></div>
+    </div>
+
+    <script>
+        var tasks = [];
+        var completedTasks = [];
+        var categories = ["Client", "Personal", "Household"];
+
+        try {
+            console.log("Loading localStorage...");
+            var storedTasks = localStorage.getItem("tasks");
+            tasks = storedTasks ? JSON.parse(storedTasks) : [];
+            var storedCompleted = localStorage.getItem("completedTasks");
+            completedTasks = storedCompleted ? JSON.parse(storedCompleted) : [];
+            console.log("Tasks loaded:", tasks, "Completed:", completedTasks);
+        } catch (e) {
+            console.log("Error loading from localStorage:", e);
+            tasks = [];
+            completedTasks = [];
+        }
+
+        function saveToStorage() {
+            try {
+                console.log("Saving to localStorage...");
+                localStorage.setItem("tasks", JSON.stringify(tasks));
+                localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
+                console.log("Saved Tasks:", tasks, "Completed:", completedTasks);
+            } catch (e) {
+                console.log("Error saving to localStorage:", e);
+            }
+        }
+
+        function safeFormatDate(dateStr) {
+            var date = new Date(dateStr);
+            if (isNaN(date.getTime())) {
+                return "Unknown Date";
+            }
+            return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        }
+
+        function addTask() {
+            console.log("Adding task...");
+            var input = document.getElementById("taskInput");
+            var categorySelect = document.getElementById("categorySelect");
+            var taskText = input.value.trim();
+
+            if (!taskText) {
+                alert("Please enter a task!");
+                return;
+            }
+
+            if (!categorySelect) {
+                console.error("Category select element not found!");
+                return;
+            }
+
+            var category = categorySelect.value;
+            var task = {
+                text: taskText,
+                category: category,
+                createdDate: new Date().toISOString()
+            };
+            tasks.push(task);
+            saveToStorage();
+            renderTasks();
+            input.value = "";
+            console.log("Task added:", task);
+        }
+
+        function renderTasks() {
+            console.log("Rendering tasks...");
+            var taskList = document.getElementById("taskList");
+            if (!taskList) {
+                console.error("Task list element not found!");
+                return;
+            }
+            taskList.innerHTML = "";
+
+            for (var i = 0; i < categories.length; i++) {
+                var category = categories[i];
+                var categoryTasks = [];
+                for (var j = 0; j < tasks.length; j++) {
+                    if (tasks[j].category === category) {
+                        categoryTasks.push(tasks[j]);
+                    }
+                }
+                if (categoryTasks.length > 0) {
+                    var section = document.createElement("div");
+                    section.className = "category-section";
+                    var heading = document.createElement("h2");
+                    heading.innerHTML = category + " Tasks";
+                    section.appendChild(heading);
+                    var ul = document.createElement("ul");
+
+                    for (var k = 0; k < categoryTasks.length; k++) { // Fixed typo: 'j' to 'k'
+                        var task = categoryTasks[k];
+                        var globalIndex = tasks.indexOf(task);
+                        var li = document.createElement("li");
+                        li.className = "task-item";
+                        var span = document.createElement("span");
+                        span.innerHTML = task.text + " (Added: " + safeFormatDate(task.createdDate) + ")";
+                        var doneBtn = document.createElement("button");
+                        doneBtn.className = "done-btn";
+                        doneBtn.innerHTML = "Done";
+                        doneBtn.onclick = (function(idx) {
+                            return function() { moveToCompleted(idx); };
+                        })(globalIndex);
+                        var delBtn = document.createElement("button");
+                        delBtn.className = "delete-btn";
+                        delBtn.innerHTML = "Delete";
+                        delBtn.onclick = (function(idx) {
+                            return function() { deleteTask(idx); };
+                        })(globalIndex);
+                        li.appendChild(span);
+                        li.appendChild(doneBtn);
+                        li.appendChild(delBtn);
+                        ul.appendChild(li);
+                    }
+                    section.appendChild(ul);
+                    taskList.appendChild(section);
+                }
+            }
+            console.log("Tasks rendered:", tasks);
+        }
+
+        function moveToCompleted(index) {
+            console.log("Moving task to completed...");
+            var task = tasks.splice(index, 1)[0];
+            completedTasks.push({
+                text: task.text,
+                category: task.category,
+                createdDate: task.createdDate,
+                completedDate: new Date().toISOString()
+            });
+            saveToStorage();
+            renderTasks();
+            renderCompletedTasks();
+            updateTimeline();
+            console.log("Task moved:", task);
+        }
+
+        function deleteTask(index) {
+            console.log("Deleting task...");
+            tasks.splice(index, 1);
+            saveToStorage();
+            renderTasks();
+            console.log("Task deleted, remaining:", tasks);
+        }
+
+        function deleteCompletedTask(index) {
+            console.log("Deleting completed task...");
+            completedTasks.splice(index, 1);
+            saveToStorage();
+            renderCompletedTasks();
+            updateTimeline();
+            console.log("Completed task deleted, remaining:", completedTasks);
+        }
+
+        function renderCompletedTasks() {
+            console.log("Rendering completed tasks...");
+            var completedList = document.getElementById("completedList");
+            if (!completedList) {
+                console.error("Completed list element not found!");
+                return;
+            }
+            completedList.innerHTML = "";
+
+            for (var i = 0; i < categories.length; i++) {
+                var category = categories[i];
+                var categoryTasks = [];
+                for (var j = 0; j < completedTasks.length; j++) {
+                    if (completedTasks[j].category === category) {
+                        categoryTasks.push(completedTasks[j]);
+                    }
+                }
+                if (categoryTasks.length > 0) {
+                    var section = document.createElement("div");
+                    section.className = "category-section";
+                    var heading = document.createElement("h2");
+                    heading.innerHTML = category + " Tasks";
+                    section.appendChild(heading);
+                    var ul = document.createElement("ul");
+
+                    for (var k = 0; k < categoryTasks.length; k++) {
+                        var task = categoryTasks[k];
+                        var globalIndex = completedTasks.indexOf(task);
+                        var li = document.createElement("li");
+                        li.className = "task-item";
+                        var span = document.createElement("span");
+                        span.innerHTML = task.text + " (Completed: " + safeFormatDate(task.completedDate) + ")";
+                        var delBtn = document.createElement("button");
+                        delBtn.className = "delete-btn";
+                        delBtn.innerHTML = "Delete";
+                        delBtn.onclick = (function(idx) {
+                            return function() { deleteCompletedTask(idx); };
+                        })(globalIndex);
+                        li.appendChild(span);
+                        li.appendChild(delBtn);
+                        ul.appendChild(li);
+                    }
+                    section.appendChild(ul);
+                    completedList.appendChild(section);
+                }
+            }
+            console.log("Completed tasks rendered:", completedTasks);
+        }
+
+        function updateTimeline() {
+            console.log("Updating timeline...");
+            var filter = document.getElementById("timeFilter").value;
+            var timelineContent = document.getElementById("timelineContent");
+            if (!timelineContent) {
+                console.error("Timeline content element not found!");
+                return;
+            }
+            timelineContent.innerHTML = "";
+
+            var now = new Date().getTime();
+            var filteredTasks = completedTasks.slice();
+
+            if (filter !== "all") {
+                var timeFrames = {
+                    "week": 7 * 24 * 60 * 60 * 1000,
+                    "month": 30 * 24 * 60 * 60 * 1000,
+                    "year": 365 * 24 * 60 * 60 * 1000
+                };
+                var cutoff = now - timeFrames[filter];
+                filteredTasks = [];
+                for (var i = 0; i < completedTasks.length; i++) {
+                    var completedTime = new Date(completedTasks[i].completedDate).getTime();
+                    if (completedTime >= cutoff) {
+                        filteredTasks.push(completedTasks[i]);
+                    }
+                }
+            }
+
+            filteredTasks.sort(function(a, b) {
+                return new Date(b.completedDate).getTime() - new Date(a.completedDate).getTime();
+            });
+
+            for (var i = 0; i < filteredTasks.length; i++) {
+                var task = filteredTasks[i];
+                var div = document.createElement("div");
+                div.className = "timeline-item";
+                div.innerHTML = safeFormatDate(task.completedDate) + ": " + task.text + " (" + task.category + ")";
+                timelineContent.appendChild(div);
+            }
+
+            if (filteredTasks.length === 0) {
+                timelineContent.innerHTML = "No tasks completed in this timeframe.";
+            }
+            console.log("Timeline updated with filter:", filter, "Tasks:", filteredTasks);
+        }
+
+        renderTasks();
+        renderCompletedTasks();
+        updateTimeline();
+
+        document.getElementById("taskInput").addEventListener("keypress", function(event) {
+            if (event.keyCode === 13 || event.which === 13) {
+                console.log("Enter key pressed, adding task...");
+                addTask();
+            }
+        }, false);
+    </script>
+</body>
+</html>
